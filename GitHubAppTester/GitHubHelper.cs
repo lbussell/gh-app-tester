@@ -20,6 +20,18 @@ public class GitHubHelper
         return new Credentials(token, AuthenticationType.Bearer);
     }
 
+    public static async Task<GitHubClient> GetAppInstallationClient(Credentials appCredentials, long installationId)
+    {
+        var appClient = CreateGitHubClient(appCredentials);
+
+        AccessToken installationToken = await appClient.GitHubApps.CreateInstallationToken(installationId);
+        Console.WriteLine($"Access token for app installation {installationId} expires at {installationToken.ExpiresAt}");
+
+        var installationCredentials = new Credentials(installationToken.Token, AuthenticationType.Bearer);
+        var installationClient = CreateGitHubClient(installationCredentials);
+        return installationClient;
+    }
+
     public static async Task<GitHubAppInfoResult> GetBasicAppInfoAsync(Credentials credentials)
     {
         var client = CreateGitHubClient(credentials);
@@ -39,7 +51,6 @@ public class GitHubHelper
     private static string CreateJwt(string clientId, string pemKeyFilePath)
     {
         string keyText = File.ReadAllText(pemKeyFilePath);
-        // Console.WriteLine("Key text: " + keyText);
 
         RsaSecurityKey rsaSecurityKey;
         using (var rsa = RSA.Create())
@@ -48,10 +59,9 @@ public class GitHubHelper
             rsaSecurityKey = new RsaSecurityKey(rsa.ExportParameters(true));
         };
 
-        var creds = new SigningCredentials(rsaSecurityKey, SecurityAlgorithms.RsaSha256);
-
+        var signingCredentials = new SigningCredentials(rsaSecurityKey, SecurityAlgorithms.RsaSha256);
         var jwt = new JwtSecurityToken(
-            new JwtHeader(creds),
+            new JwtHeader(signingCredentials),
             new JwtPayload(
                 issuer: clientId,
                 issuedAt: DateTime.Now,
